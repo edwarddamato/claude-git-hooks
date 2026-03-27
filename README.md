@@ -34,10 +34,36 @@ chmod +x .git/hooks/pre-push
 #### How it works
 
 1. Computes the diff of commits about to be pushed
-2. Passes the diff to `claude --print` with instructions to only edit `CLAUDE.md` for significant changes
-3. If `CLAUDE.md` is modified, shows the diff and prompts:
-   - `y` — amends the last commit with the update and continues the push
-   - `skip` — continues the push without committing the change
-   - `N` (default) — aborts the push so you can review and commit manually
+2. Passes the diff (alongside current `CLAUDE.md` contents) to `claude --print` with instructions to assess every change individually and update `CLAUDE.md` if anything is stale or undocumented
+3. If `CLAUDE.md` is modified, automatically amends the last commit and force-pushes the updated commit to the remote
+4. If no changes are needed, the original push continues uninterrupted
 
 If the `claude` CLI is not found, the hook warns and exits without blocking the push.
+
+#### Flow
+
+```mermaid
+sequenceDiagram
+    actor Dev as Developer
+    participant Git as Git
+    participant Hook as pre-push hook
+    participant Claude as Claude CLI
+    participant Remote as Remote (GitHub)
+
+    Dev->>Git: git push
+    Git->>Hook: invoke pre-push (stdin: ref + SHAs)
+    Hook->>Hook: compute diff of outgoing commits
+    Hook->>Claude: diff + current CLAUDE.md contents
+    Claude->>Claude: assess each change individually
+
+    alt CLAUDE.md needs updating
+        Claude->>Hook: edits CLAUDE.md, prints OUTCOME: UPDATED
+        Hook->>Git: git commit --amend --no-edit
+        Hook->>Remote: git push --force-with-lease
+        Hook->>Git: exit 1 (cancel original push — already handled)
+    else no changes needed
+        Claude->>Hook: prints OUTCOME: NO_CHANGE
+        Hook->>Git: exit 0
+        Git->>Remote: push original commits
+    end
+```
