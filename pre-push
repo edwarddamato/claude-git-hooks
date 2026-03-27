@@ -21,30 +21,30 @@ if [[ ! -f "$CLAUDE_MD" ]]; then
   exit 0
 fi
 
-# Determine the range of commits being pushed.
+# Collect all commits being pushed and diff each against its parent.
 # git passes lines of: <local ref> <local sha1> <remote ref> <remote sha1>
-RANGE=""
+COMMITS=()
 while read -r local_ref local_sha remote_ref remote_sha; do
   if [[ "$remote_sha" == "0000000000000000000000000000000000000000" ]]; then
-    # New branch — diff against merge base with the default branch
-    DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo "main")
-    BASE=$(git merge-base HEAD "origin/$DEFAULT_BRANCH" 2>/dev/null || true)
-    if [[ -n "$BASE" ]]; then
-      RANGE="$BASE..$local_sha"
-    else
-      RANGE="$local_sha"
-    fi
+    # New branch — collect all commits reachable from local_sha with no remote
+    mapfile -t NEW_COMMITS < <(git rev-list "$local_sha" --not --remotes 2>/dev/null || true)
+    COMMITS+=("${NEW_COMMITS[@]}")
   else
-    RANGE="$remote_sha..$local_sha"
+    mapfile -t NEW_COMMITS < <(git rev-list "$remote_sha..$local_sha" 2>/dev/null || true)
+    COMMITS+=("${NEW_COMMITS[@]}")
   fi
   break  # only process the first ref
 done
 
-if [[ -z "$RANGE" ]]; then
+if [[ ${#COMMITS[@]} -eq 0 ]]; then
   exit 0
 fi
 
-DIFF=$(git diff "$RANGE" 2>/dev/null || true)
+# Build diff by comparing each commit to its parent
+DIFF=""
+for sha in "${COMMITS[@]}"; do
+  DIFF+=$(git diff "${sha}^!" 2>/dev/null || true)
+done
 
 if [[ -z "$DIFF" ]]; then
   exit 0
