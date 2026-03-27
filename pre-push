@@ -120,10 +120,13 @@ if git diff --quiet "$CLAUDE_MD" 2>/dev/null && [[ -z "$(git ls-files --others -
   exit 0
 fi
 
-echo "[pre-push] Claude modified $CLAUDE_MD — amending last commit automatically."
+echo "[pre-push] Claude modified $CLAUDE_MD — amending and re-pushing."
 
 git add "$CLAUDE_MD"
 git commit --amend --no-edit
-echo "[pre-push] Amended — push will continue with updated commit."
+git push "$1"
 
-exit 0
+# Cancel the original push — git captured the pre-amend SHA at invocation,
+# so the original push would diverge. The git push above already pushed the
+# correct amended commit.
+exit 1
