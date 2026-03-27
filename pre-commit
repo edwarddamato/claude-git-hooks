@@ -1,4 +1,44 @@
 #!/usr/bin/env bash
-# Test pre-commit hook — does nothing, exits cleanly.
-echo "[pre-commit] test hook ran"
+# pre-commit hook: checks staged files for debug statements and enforces
+# conventional commit message format.
+
+set -euo pipefail
+
+ERRORS=0
+
+# ── 1. Debug statement check ─────────────────────────────────────────────────
+DEBUG_PATTERN='console\.log|debugger'
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [[ -n "$STAGED_FILES" ]]; then
+  while IFS= read -r file; do
+    MATCHES=$(git diff --cached -- "$file" | grep '^+' | grep -E "$DEBUG_PATTERN" || true)
+    if [[ -n "$MATCHES" ]]; then
+      echo "[pre-commit] Debug statement found in $file:"
+      echo "$MATCHES" | sed 's/^/  /'
+      ERRORS=$((ERRORS + 1))
+    fi
+  done <<< "$STAGED_FILES"
+fi
+
+# ── 2. Commit message format check ───────────────────────────────────────────
+# Conventional commits: type(scope)!: description
+# Types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert
+COMMIT_MSG_FILE="${1:-}"
+if [[ -n "$COMMIT_MSG_FILE" && -f "$COMMIT_MSG_FILE" ]]; then
+  MSG=$(head -1 "$COMMIT_MSG_FILE")
+  PATTERN='^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([^)]+\))?(!)?: .+'
+  if ! echo "$MSG" | grep -qE "$PATTERN"; then
+    echo "[pre-commit] Commit message does not follow conventional commits format."
+    echo "  Expected: type(scope): description"
+    echo "  Types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert"
+    echo "  Got: $MSG"
+    ERRORS=$((ERRORS + 1))
+  fi
+fi
+
+if [[ $ERRORS -gt 0 ]]; then
+  exit 1
+fi
+
 exit 0
