@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# pre-push hook: uses Claude Code to review outgoing commits and update CLAUDE.md if needed.
+#
+# Install:
+#   cp pre-push ~/.githooks/pre-push
+#   chmod +x ~/.githooks/pre-push
+#   git config --global core.hooksPath ~/.githooks
+
+set -euo pipefail
+
+CLAUDE_MD="CLAUDE.md"
+
+# Skip if claude CLI is not available
+if ! command -v claude &>/dev/null; then
+  echo "[pre-push] 'claude' CLI not found — skipping CLAUDE.md review."
+  exit 0
+fi
+
+# Skip if there is no CLAUDE.md in the repo root
+if [[ ! -f "$CLAUDE_MD" ]]; then
+  exit 0
+fi
+
+# Determine the range of commits being pushed.
+# git passes lines of: <local ref> <local sha1> <remote ref> <remote sha1>
+RANGE=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [[ "$remote_sha" == "0000000000000000000000000000000000000000" ]]; then
+    # New branch — diff against merge base with the default branch
+    DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo "main")
+    BASE=$(git merge-base HEAD "origin/$DEFAULT_BRANCH" 2>/dev/null || true)
+    if [[ -n "$BASE" ]]; then
+      RANGE="$BASE..$local_sha"
+    else
+      RANGE="$local_sha"
+    fi
+  else
+    RANGE="$remote_sha..$local_sha"
+  fi
+  break  # only process the first ref
+done
+
+if [[ -z "$RANGE" ]]; then
+  exit 0
+fi
+
+DIFF=$(git diff "$RANGE" 2>/dev/null || true)
+
+if [[ -z "$DIFF" ]]; then
+  exit 0
+fi
+
+PROMPT="You are reviewing a git diff to decide if CLAUDE.md needs updating.
+
+CLAUDE.md is a project context file used by Claude Code (an AI coding assistant). It typically documents: commands, architecture, conventions, deployment details, and environment variables. It helps Claude Code understand the project without re-reading the whole codebase each session.
+
+Rules:
+- Only update CLAUDE.md if the diff introduces something an AI assistant or new developer would need to know: new scripts or commands, new environment variables, new architectural patterns, new dependencies that change how the project works, config changes, or structural refactors.
+- Do NOT update for: bug fixes, UI tweaks, copy changes, test-only changes, CI-only commits, or lock file changes.
+- If an update is needed, edit CLAUDE.md directly (it is at ./$CLAUDE_MD) and print one line summarising what you changed.
+- If no update is needed, print nothing and exit.
+
+Diff:
+$DIFF"
+
+echo "[pre-push] Reviewing diff with Claude for CLAUDE.md updates..."
+SUMMARY=$(claude --print "$PROMPT" 2>/dev/null || true)
+
+# Check if CLAUDE.md was modified by claude
+if git diff --quiet "$CLAUDE_MD" 2>/dev/null; then
+  exit 0
+fi
+
+echo ""
+echo "[pre-push] Claude updated $CLAUDE_MD:"
+[[ -n "$SUMMARY" ]] && echo "  $SUMMARY"
+echo ""
+git diff "$CLAUDE_MD"
+echo ""
+
+# Prompt the developer — must read from /dev/tty since git owns stdin
+exec < /dev/tty
+read -r -p "[pre-push] Stage and amend last commit with this change? [y/N/skip] " RESPONSE
+
+case "$RESPONSE" in
+  y|Y)
+    git add "$CLAUDE_MD"
+    git commit --amend --no-edit
+    echo "[pre-push] Amended last commit with CLAUDE.md update."
+    ;;
+  skip|s|S)
+    echo "[pre-push] Skipping — CLAUDE.md changes left unstaged."
+    ;;
+  *)
+    echo "[pre-push] Push aborted. Review CLAUDE.md and commit the changes manually."
+    git checkout -- "$CLAUDE_MD"
+    exit 1
+    ;;
+esac
+
+exit 0
