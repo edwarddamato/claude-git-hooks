@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
-# pre-commit hook: echoes a random emoji.
+# pre-commit hook: uses shellcheck to lint staged shell scripts.
+#
+# Install shellcheck:
+#   brew install shellcheck
+#
+# Requires: shellcheck in PATH
 
-EMOJIS=("🚀" "🎉" "🔥" "🌈" "⚡" "🦄" "🍕" "🐙" "🎸" "🌮" "🦊" "🍦" "🎯" "🐳" "🌻")
-echo "${EMOJIS[$RANDOM % ${#EMOJIS[@]}]}"
+set -euo pipefail
+
+if ! command -v shellcheck &>/dev/null; then
+  echo "[pre-commit] 'shellcheck' not found — skipping lint. Install with: brew install shellcheck"
+  exit 0
+fi
+
+STAGED_SHELL_FILES=$(git diff --cached --name-only --diff-filter=ACM | xargs file 2>/dev/null | grep -E 'shell|bash' | cut -d: -f1 || true)
+
+if [[ -z "$STAGED_SHELL_FILES" ]]; then
+  exit 0
+fi
+
+echo "[pre-commit] Running shellcheck on staged shell scripts..."
+echo "$STAGED_SHELL_FILES" | xargs shellcheck
+echo "[pre-commit] shellcheck passed."
