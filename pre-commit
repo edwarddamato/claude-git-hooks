@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Test pre-commit hook — does nothing, exits cleanly.
+echo "[pre-commit] test hook ran"
+exit 0
