@@ -106,11 +106,6 @@ Diff:
 $DIFF"
 fi
 
-IS_NEW_FILE=false
-if [[ -z "$CLAUDE_MD_CONTENT" ]]; then
-  IS_NEW_FILE=true
-fi
-
 echo "[pre-push] Running Claude to review diff..."
 SUMMARY=$(echo "$PROMPT" | claude --print --allowedTools "Edit,Write" 2>/dev/null || true)
 
@@ -126,49 +121,13 @@ if git diff --quiet "$CLAUDE_MD" 2>/dev/null && [[ -z "$(git ls-files --others -
 fi
 
 if [[ "$IS_NEW_FILE" == true ]]; then
-  echo "[pre-push] Claude would create $CLAUDE_MD:"
+  echo "[pre-push] Claude created $CLAUDE_MD — amending last commit automatically."
 else
-  echo "[pre-push] Claude updated $CLAUDE_MD:"
-fi
-echo ""
-if [[ "$IS_NEW_FILE" == true ]]; then
-  cat "$CLAUDE_MD"
-else
-  git diff "$CLAUDE_MD"
-fi
-echo ""
-
-# Prompt the developer — must read from /dev/tty since git owns stdin
-exec < /dev/tty
-if [[ "$IS_NEW_FILE" == true ]]; then
-  read -r -p "[pre-push] Create $CLAUDE_MD and amend last commit? [y/N/skip] " RESPONSE
-else
-  read -r -p "[pre-push] Stage and amend last commit with this change? [y/N/skip] " RESPONSE
+  echo "[pre-push] Claude updated $CLAUDE_MD — amending last commit automatically."
 fi
 
-case "$RESPONSE" in
-  y|Y)
-    git add "$CLAUDE_MD"
-    git commit --amend --no-edit
-    if [[ "$IS_NEW_FILE" == true ]]; then
-      echo "[pre-push] Created $CLAUDE_MD and amended last commit."
-    else
-      echo "[pre-push] Amended last commit with CLAUDE.md update."
-    fi
-    ;;
-  skip|s|S)
-    echo "[pre-push] Skipping — $CLAUDE_MD changes left unstaged."
-    ;;
-  *)
-    if [[ "$IS_NEW_FILE" == true ]]; then
-      echo "[pre-push] Push aborted. $CLAUDE_MD was not created."
-      rm -f "$CLAUDE_MD"
-    else
-      echo "[pre-push] Push aborted. Review CLAUDE.md and commit the changes manually."
-      git checkout -- "$CLAUDE_MD"
-    fi
-    exit 1
-    ;;
-esac
+git add "$CLAUDE_MD"
+git commit --amend --no-edit
+echo "[pre-push] Amended."
 
 exit 0
