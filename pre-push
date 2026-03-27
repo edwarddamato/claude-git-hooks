@@ -16,29 +16,30 @@ if ! command -v claude &>/dev/null; then
   exit 0
 fi
 
-# Skip if there is no CLAUDE.md in the repo root
-if [[ ! -f "$CLAUDE_MD" ]]; then
-  exit 0
-fi
-
 # Collect all commits being pushed and diff each against its parent.
 # git passes lines of: <local ref> <local sha1> <remote ref> <remote sha1>
 COMMITS=()
 while read -r local_ref local_sha remote_ref remote_sha; do
+  echo "[pre-push] Processing ref: $local_ref ($local_sha -> $remote_sha)"
   if [[ "$remote_sha" == "0000000000000000000000000000000000000000" ]]; then
     # New branch — collect all commits reachable from local_sha with no remote
     mapfile -t NEW_COMMITS < <(git rev-list "$local_sha" --not --remotes 2>/dev/null || true)
+    echo "[pre-push] New branch — found ${#NEW_COMMITS[@]} commit(s) with no remote counterpart."
     COMMITS+=("${NEW_COMMITS[@]}")
   else
     mapfile -t NEW_COMMITS < <(git rev-list "$remote_sha..$local_sha" 2>/dev/null || true)
+    echo "[pre-push] Existing branch — found ${#NEW_COMMITS[@]} new commit(s) ahead of remote."
     COMMITS+=("${NEW_COMMITS[@]}")
   fi
   break  # only process the first ref
 done
 
 if [[ ${#COMMITS[@]} -eq 0 ]]; then
+  echo "[pre-push] No new commits to review — skipping CLAUDE.md check."
   exit 0
 fi
+
+echo "[pre-push] Building diff for ${#COMMITS[@]} commit(s)..."
 
 # Build diff by comparing each commit to its parent
 DIFF=""
@@ -47,53 +48,111 @@ for sha in "${COMMITS[@]}"; do
 done
 
 if [[ -z "$DIFF" ]]; then
+  echo "[pre-push] Empty diff — skipping CLAUDE.md check."
   exit 0
 fi
 
-PROMPT="You are reviewing a git diff to decide if CLAUDE.md needs updating.
+# Read existing CLAUDE.md content (may be empty or missing)
+CLAUDE_MD_CONTENT=""
+if [[ -s "$CLAUDE_MD" ]]; then
+  CLAUDE_MD_CONTENT=$(cat "$CLAUDE_MD")
+fi
 
-CLAUDE.md is a project context file used by Claude Code (an AI coding assistant). It typically documents: commands, architecture, conventions, deployment details, and environment variables. It helps Claude Code understand the project without re-reading the whole codebase each session.
+if [[ -z "$CLAUDE_MD_CONTENT" ]]; then
+  echo "[pre-push] CLAUDE.md is empty or missing — will create from scratch if diff warrants it."
+  PROMPT="You are setting up CLAUDE.md for a project.
 
-Rules:
-- Only update CLAUDE.md if the diff introduces something an AI assistant or new developer would need to know: new scripts or commands, new environment variables, new architectural patterns, new dependencies that change how the project works, config changes, or structural refactors.
-- Do NOT update for: bug fixes, UI tweaks, copy changes, test-only changes, CI-only commits, or lock file changes.
-- If an update is needed, edit CLAUDE.md directly (it is at ./$CLAUDE_MD) and print one line summarising what you changed.
-- If no update is needed, print nothing and exit.
+CLAUDE.md is a project context file used by Claude Code (an AI coding assistant). It documents the things an AI assistant or new developer needs to know to work on the project: how to run, build, test, and lint the project; environment variables; architecture and key conventions; notable dependencies.
+
+CLAUDE.md does not exist yet (or is empty). Based on the git diff below, create it from scratch. Include only what is concretely evidenced by the diff — do not invent or assume anything not present.
+
+Write the new content directly to ./$CLAUDE_MD, then print one line summarising what you wrote.
 
 Diff:
 $DIFF"
+else
+  echo "[pre-push] CLAUDE.md found — checking diff against existing contents..."
+  PROMPT="You are reviewing a git diff to decide whether CLAUDE.md needs updating.
 
-echo "[pre-push] Reviewing diff with Claude for CLAUDE.md updates..."
+CLAUDE.md is a project context file used by Claude Code (an AI coding assistant). It documents the things an AI assistant or new developer needs to know to work on the project.
+
+Current contents of CLAUDE.md:
+---
+$CLAUDE_MD_CONTENT
+---
+
+Go through the diff below file by file. For each file, consider:
+1. Does the diff make any existing CLAUDE.md content stale or incorrect? If so, update it.
+2. Does the diff add or change something that falls under a category already documented in CLAUDE.md (e.g. a new script in a 'Commands' section, a new env var in an 'Environment variables' section)? If so, add it.
+3. Does the diff introduce a new concept significant enough to warrant a new section (e.g. a new tool, a new architectural pattern, a new required service)? If so, add it.
+
+Do NOT update for: pure formatting/whitespace changes, bug fixes, UI copy changes, test-only changes, or lock file churn — unless those files also contain a relevant trigger as above.
+
+If changes are needed, edit CLAUDE.md directly (it is at ./$CLAUDE_MD) and print one line summarising what you changed.
+If no changes are needed, print nothing and exit.
+
+Diff:
+$DIFF"
+fi
+
+IS_NEW_FILE=false
+if [[ -z "$CLAUDE_MD_CONTENT" ]]; then
+  IS_NEW_FILE=true
+fi
+
+echo "[pre-push] Running Claude to review diff..."
 SUMMARY=$(claude --print "$PROMPT" 2>/dev/null || true)
 
-# Check if CLAUDE.md was modified by claude
-if git diff --quiet "$CLAUDE_MD" 2>/dev/null; then
+# Check if CLAUDE.md was modified or created by claude
+if git diff --quiet "$CLAUDE_MD" 2>/dev/null && [[ -z "$(git ls-files --others --exclude-standard "$CLAUDE_MD")" ]]; then
+  echo "[pre-push] No CLAUDE.md changes needed."
   exit 0
 fi
 
 echo ""
-echo "[pre-push] Claude updated $CLAUDE_MD:"
+if [[ "$IS_NEW_FILE" == true ]]; then
+  echo "[pre-push] Claude would create $CLAUDE_MD:"
+else
+  echo "[pre-push] Claude updated $CLAUDE_MD:"
+fi
 [[ -n "$SUMMARY" ]] && echo "  $SUMMARY"
 echo ""
-git diff "$CLAUDE_MD"
+if [[ "$IS_NEW_FILE" == true ]]; then
+  cat "$CLAUDE_MD"
+else
+  git diff "$CLAUDE_MD"
+fi
 echo ""
 
 # Prompt the developer — must read from /dev/tty since git owns stdin
 exec < /dev/tty
-read -r -p "[pre-push] Stage and amend last commit with this change? [y/N/skip] " RESPONSE
+if [[ "$IS_NEW_FILE" == true ]]; then
+  read -r -p "[pre-push] Create $CLAUDE_MD and amend last commit? [y/N/skip] " RESPONSE
+else
+  read -r -p "[pre-push] Stage and amend last commit with this change? [y/N/skip] " RESPONSE
+fi
 
 case "$RESPONSE" in
   y|Y)
     git add "$CLAUDE_MD"
     git commit --amend --no-edit
-    echo "[pre-push] Amended last commit with CLAUDE.md update."
+    if [[ "$IS_NEW_FILE" == true ]]; then
+      echo "[pre-push] Created $CLAUDE_MD and amended last commit."
+    else
+      echo "[pre-push] Amended last commit with CLAUDE.md update."
+    fi
     ;;
   skip|s|S)
-    echo "[pre-push] Skipping — CLAUDE.md changes left unstaged."
+    echo "[pre-push] Skipping — $CLAUDE_MD changes left unstaged."
     ;;
   *)
-    echo "[pre-push] Push aborted. Review CLAUDE.md and commit the changes manually."
-    git checkout -- "$CLAUDE_MD"
+    if [[ "$IS_NEW_FILE" == true ]]; then
+      echo "[pre-push] Push aborted. $CLAUDE_MD was not created."
+      rm -f "$CLAUDE_MD"
+    else
+      echo "[pre-push] Push aborted. Review CLAUDE.md and commit the changes manually."
+      git checkout -- "$CLAUDE_MD"
+    fi
     exit 1
     ;;
 esac
