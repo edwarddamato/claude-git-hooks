@@ -127,6 +127,8 @@ git add "$CLAUDE_MD"
 git commit --amend --no-edit
 echo "[pre-push] Amended. Force-pushing to include CLAUDE.md update..."
 git push --force-with-lease "$REMOTE"
-echo "[pre-push] Done."
+echo "[pre-push] Push complete (force-pushed amended commit with CLAUDE.md update)."
+# Cancel the original push — the amended commit has already been pushed above
+exit 1
 
 exit 0
