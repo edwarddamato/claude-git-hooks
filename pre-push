@@ -90,8 +90,17 @@ For each file, work through these steps in order:
 
 Do NOT update for: pure formatting/whitespace changes, bug fixes, UI copy changes, test-only changes, or lock file churn — unless those files also contain a relevant trigger as above.
 
-If changes are needed, edit CLAUDE.md directly (it is at ./$CLAUDE_MD) and print one line summarising what you changed.
-If no changes are needed, print nothing and exit.
+After your assessment, you MUST print a report in exactly this format (always — whether or not you made changes):
+OUTCOME: UPDATED
+REASONS:
+- <reason for each change made>
+
+or if no changes were needed:
+OUTCOME: NO_CHANGE
+REASONS:
+- <reason each notable change was assessed and not documented>
+
+If changes are needed, edit CLAUDE.md directly (it is at ./$CLAUDE_MD) before printing the report.
 
 Diff:
 $DIFF"
@@ -105,19 +114,22 @@ fi
 echo "[pre-push] Running Claude to review diff..."
 SUMMARY=$(claude --print "$PROMPT" 2>/dev/null || true)
 
+echo ""
+echo "[pre-push] Claude assessment:"
+echo "$SUMMARY" | sed 's/^/  /'
+echo ""
+
 # Check if CLAUDE.md was modified or created by claude
 if git diff --quiet "$CLAUDE_MD" 2>/dev/null && [[ -z "$(git ls-files --others --exclude-standard "$CLAUDE_MD")" ]]; then
-  echo "[pre-push] No CLAUDE.md changes needed."
+  echo "[pre-push] No CLAUDE.md changes detected on disk."
   exit 0
 fi
 
-echo ""
 if [[ "$IS_NEW_FILE" == true ]]; then
   echo "[pre-push] Claude would create $CLAUDE_MD:"
 else
   echo "[pre-push] Claude updated $CLAUDE_MD:"
 fi
-[[ -n "$SUMMARY" ]] && echo "  $SUMMARY"
 echo ""
 if [[ "$IS_NEW_FILE" == true ]]; then
   cat "$CLAUDE_MD"
