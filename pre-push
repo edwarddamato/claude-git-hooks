@@ -120,11 +120,7 @@ if git diff --quiet "$CLAUDE_MD" 2>/dev/null && [[ -z "$(git ls-files --others -
   exit 0
 fi
 
-if [[ "$IS_NEW_FILE" == true ]]; then
-  echo "[pre-push] Claude created $CLAUDE_MD — amending last commit automatically."
-else
-  echo "[pre-push] Claude updated $CLAUDE_MD — amending last commit automatically."
-fi
+echo "[pre-push] Claude modified $CLAUDE_MD — amending last commit automatically."
 
 git add "$CLAUDE_MD"
 git commit --amend --no-edit
