@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# pre-commit hook: echoes a random emoji.
+
+EMOJIS=("🚀" "🎉" "🔥" "🌈" "⚡" "🦄" "🍕" "🐙" "🎸" "🌮" "🦊" "🍦" "🎯" "🐳" "🌻")
+echo "${EMOJIS[$RANDOM % ${#EMOJIS[@]}]}"
