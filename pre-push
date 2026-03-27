@@ -9,7 +9,6 @@
 set -euo pipefail
 
 CLAUDE_MD="CLAUDE.md"
-REMOTE="${1:-origin}"
 
 # Skip if claude CLI is not available
 if ! command -v claude &>/dev/null; then
@@ -125,10 +124,6 @@ echo "[pre-push] Claude modified $CLAUDE_MD — amending last commit automatical
 
 git add "$CLAUDE_MD"
 git commit --amend --no-edit
-echo "[pre-push] Amended. Re-pushing with CLAUDE.md update included..."
-git push "$REMOTE"
-echo "[pre-push] Push complete."
-# Cancel the original push — the amended commit has already been pushed above
-exit 1
+echo "[pre-push] Amended — push will continue with updated commit."
 
 exit 0

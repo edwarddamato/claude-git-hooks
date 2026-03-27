@@ -35,7 +35,7 @@ chmod +x .git/hooks/pre-push
 
 1. Computes the diff of commits about to be pushed
 2. Passes the diff (alongside current `CLAUDE.md` contents) to `claude --print` with instructions to assess every change individually and update `CLAUDE.md` if anything is stale or undocumented
-3. If `CLAUDE.md` is modified, cancels the original push, amends the last commit, then re-pushes — the hook runs again on the re-push, finds no further changes, and the push succeeds normally
+3. If `CLAUDE.md` is modified, amends the last commit and exits 0 — git resolves the ref after the hook exits, so the amended commit is what gets pushed
 4. If no changes are needed, the original push continues uninterrupted
 
 If the `claude` CLI is not found, the hook warns and exits without blocking the push.
@@ -59,9 +59,8 @@ sequenceDiagram
     alt CLAUDE.md needs updating
         Claude->>Hook: edits CLAUDE.md, prints OUTCOME: UPDATED
         Hook->>Git: git commit --amend --no-edit
-        Hook->>Git: exit 1 (cancel original push)
-        Hook->>Remote: git push (re-push with amended commit)
-        Note over Hook,Remote: hook runs again, finds NO_CHANGE, push succeeds
+        Hook->>Git: exit 0
+        Git->>Remote: push amended commit (ref resolved after hook exits)
     else no changes needed
         Claude->>Hook: prints OUTCOME: NO_CHANGE
         Hook->>Git: exit 0
