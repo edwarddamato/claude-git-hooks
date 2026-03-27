@@ -112,7 +112,7 @@ if [[ -z "$CLAUDE_MD_CONTENT" ]]; then
 fi
 
 echo "[pre-push] Running Claude to review diff..."
-SUMMARY=$(claude --print "$PROMPT" 2>/dev/null || true)
+SUMMARY=$(claude --print --allowedTools "Edit,Write" "$PROMPT" 2>/dev/null || true)
 
 echo ""
 echo "[pre-push] Claude assessment:"
