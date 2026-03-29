@@ -41,9 +41,15 @@ fi
 
 echo "[pre-push] Building diff for ${#COMMITS[@]} commit(s)..."
 
-# Build diff by comparing each commit to its parent
+# Build diff by comparing each commit to its parent, skipping commits that
+# only touch CLAUDE.md (e.g. the hook's own follow-up commits)
 DIFF=""
 for sha in "${COMMITS[@]}"; do
+  CHANGED_FILES=$(git diff --name-only "${sha}^!" 2>/dev/null || true)
+  if [[ "$CHANGED_FILES" == "$CLAUDE_MD" ]]; then
+    echo "[pre-push] Skipping $sha — only contains CLAUDE.md changes."
+    continue
+  fi
   DIFF+=$(git diff "${sha}^!" 2>/dev/null || true)
 done
 
