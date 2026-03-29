@@ -126,7 +126,6 @@ git add "$CLAUDE_MD"
 git commit --amend --no-edit
 git push "$1"
 
-# Cancel the original push — git captured the pre-amend SHA at invocation,
-# so the original push would diverge. The git push above already pushed the
-# correct amended commit.
-exit 1
+# Exit 0 — the amended commit was already pushed above. Git will attempt
+# the original push but find the remote already up to date and no-op cleanly.
+exit 0
