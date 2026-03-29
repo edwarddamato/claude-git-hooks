@@ -120,12 +120,14 @@ if git diff --quiet "$CLAUDE_MD" 2>/dev/null && [[ -z "$(git ls-files --others -
   exit 0
 fi
 
-echo "[pre-push] Claude modified $CLAUDE_MD — creating follow-up commit and pushing."
+echo "[pre-push] Claude modified $CLAUDE_MD — creating follow-up commit."
 
 git add "$CLAUDE_MD"
 git commit -m "chore: update CLAUDE.md [pre-push]"
-git push "$1"
 
-# Exit 1 to cancel the outer push — the commits including the CLAUDE.md update
-# have already been pushed by the explicit git push above.
+echo ""
+echo "[pre-push] A new commit with the CLAUDE.md update has been created."
+echo "[pre-push] Please run 'git push' again to include it."
+echo ""
+
 exit 1
