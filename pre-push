@@ -120,12 +120,8 @@ if git diff --quiet "$CLAUDE_MD" 2>/dev/null && [[ -z "$(git ls-files --others -
   exit 0
 fi
 
-echo "[pre-push] Claude modified $CLAUDE_MD — amending and re-pushing."
+echo "[pre-push] Claude modified $CLAUDE_MD — amending last commit."
 
 git add "$CLAUDE_MD"
 git commit --amend --no-edit
-git push "$1"
-
-# Exit 0 — the amended commit was already pushed above. Git will attempt
-# the original push but find the remote already up to date and no-op cleanly.
-exit 0
+echo "[pre-push] Amended — continuing push with updated commit."
