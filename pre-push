@@ -94,7 +94,9 @@ For each file, work through these steps in order:
 2. Look at every added or modified line (lines starting with +). Does it add or change something that falls under a category already documented in CLAUDE.md (e.g. a new script in a 'Commands' section, a new env var in an 'Environment variables' section)? If so, add it.
 3. Does the diff introduce a new concept significant enough to warrant a new section (e.g. a new tool, a new architectural pattern, a new required service)? If so, add it.
 
-Do NOT update for: pure formatting/whitespace changes, bug fixes, UI copy changes, test-only changes, or lock file churn — unless those files also contain a relevant trigger as above.
+Do NOT update for: pure formatting/whitespace changes, UI copy changes, test-only changes, or lock file churn — unless those files also contain a relevant trigger as above.
+
+Bug fixes are NOT automatically excluded. If a bug fix changes observable behaviour (e.g. a different branching strategy, a changed exit code, a new skip condition), and CLAUDE.md describes that behaviour, update it. Only skip a bug fix if it corrects something to match what CLAUDE.md already says.
 
 After your assessment, you MUST print a report in exactly this format (always — whether or not you made changes):
 OUTCOME: UPDATED
