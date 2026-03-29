@@ -125,9 +125,4 @@ echo "[pre-push] Claude modified $CLAUDE_MD — creating follow-up commit."
 git add "$CLAUDE_MD"
 git commit -m "chore: update CLAUDE.md [pre-push]"
 
-echo ""
-echo "[pre-push] A new commit with the CLAUDE.md update has been created."
-echo "[pre-push] Please run 'git push' again to include it."
-echo ""
-
-exit 1
+echo "[pre-push] Done. Run 'git push' again to push the CLAUDE.md update."
