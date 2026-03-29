@@ -16,7 +16,7 @@ A single `pre-push` git hook script that uses the `claude --print` CLI to automa
 1. Reads stdin from git (format: `<local ref> <local sha> <remote ref> <remote sha>`) to determine the commit range being pushed
 2. For new branches, diffs against the merge base with `origin/HEAD` (defaults to `main`)
 3. Passes the full `git diff` to `claude --print` with a prompt instructing it to edit `CLAUDE.md` only for significant changes (new commands, env vars, dependencies, architectural patterns, config changes)
-4. If `CLAUDE.md` was modified, creates a new follow-up commit (`chore: update CLAUDE.md [pre-push]`), pushes it explicitly via `git push`, then exits 1 to cancel the original outer push (which has already been superseded by the explicit push)
+4. If `CLAUDE.md` was modified, creates a new follow-up commit (`chore: update CLAUDE.md [pre-push]`), exits 1 to cancel the original push, and instructs the user to run `git push` again to include the new commit
 
 ## Key design constraints
 
