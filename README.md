@@ -6,14 +6,13 @@ Git hooks that use [Claude Code](https://claude.ai/code) to keep your project co
 
 ### `pre-push` — Auto-update CLAUDE.md
 
-Before each push, reviews the outgoing commits and updates `CLAUDE.md` if any architecturally significant changes are detected (new commands, env vars, dependencies, patterns, config changes). Skips silently for trivial changes like bug fixes, UI tweaks, or test-only commits.
+Before each push, reviews the outgoing commits and updates `CLAUDE.md` if it no longer accurately reflects the codebase. If `CLAUDE.md` doesn't exist yet, Claude will create it from scratch.
 
-If Claude updates `CLAUDE.md`, you are prompted to amend your last commit before the push continues.
+If Claude updates `CLAUDE.md`, a new commit is created automatically and you are asked to run `git push` again to include it.
 
 #### Prerequisites
 
 - [Claude Code](https://claude.ai/code) CLI installed and authenticated (`claude` command available in PATH)
-- A `CLAUDE.md` file at the root of your repo (the hook skips repos without one)
 
 #### Install (global — applies to all repos)
 
@@ -33,9 +32,9 @@ chmod +x .git/hooks/pre-push
 
 #### How it works
 
-1. Computes the diff of commits about to be pushed
-2. Passes the diff (alongside current `CLAUDE.md` contents) to `claude --print` with instructions to assess every change individually and update `CLAUDE.md` if anything is stale or undocumented
-3. If `CLAUDE.md` is modified, amends the last commit and exits 0 — git resolves the ref after the hook exits, so the amended commit is what gets pushed
+1. Computes the diff of commits about to be pushed, skipping any commits that only touch `CLAUDE.md`
+2. Passes the diff alongside the current `CLAUDE.md` contents to `claude --print`, asking it to verify that CLAUDE.md gives an accurate picture of the project after the changes
+3. If `CLAUDE.md` is modified, a new `chore: update CLAUDE.md [pre-push]` commit is created and you are asked to run `git push` again to include it
 4. If no changes are needed, the original push continues uninterrupted
 
 If the `claude` CLI is not found, the hook warns and exits without blocking the push.
@@ -58,9 +57,12 @@ sequenceDiagram
 
     alt CLAUDE.md needs updating
         Claude->>Hook: edits CLAUDE.md, prints OUTCOME: UPDATED
-        Hook->>Git: git commit --amend --no-edit
+        Hook->>Git: git commit -m "chore: update CLAUDE.md [pre-push]"
+        Hook->>Dev: "Run git push again to include the CLAUDE.md update"
         Hook->>Git: exit 0
-        Git->>Remote: push amended commit (ref resolved after hook exits)
+        Git->>Remote: push original commits (CLAUDE.md commit not yet included)
+        Dev->>Git: git push
+        Git->>Remote: push CLAUDE.md commit
     else no changes needed
         Claude->>Hook: prints OUTCOME: NO_CHANGE
         Hook->>Git: exit 0
