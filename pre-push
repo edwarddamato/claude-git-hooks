@@ -78,25 +78,24 @@ Diff:
 $DIFF"
 else
   echo "[pre-push] CLAUDE.md found — checking diff against existing contents..."
-  PROMPT="You are reviewing a git diff to decide whether CLAUDE.md needs updating.
+  PROMPT="You are a technical reviewer. Your job is to check whether CLAUDE.md accurately reflects the current state of the codebase based on the changes in the diff below.
 
-CLAUDE.md is a project context file used by Claude Code (an AI coding assistant). It documents the things an AI assistant or new developer needs to know to work on the project.
+CLAUDE.md is a project context file used by Claude Code (an AI coding assistant). It should give an AI assistant or new developer an accurate understanding of the project: how it works, how to run it, its architecture, key conventions, commands, environment variables, and dependencies.
 
 Current contents of CLAUDE.md:
 ---
 $CLAUDE_MD_CONTENT
 ---
 
-Go through the diff below file by file. Assess every change individually — do not assume any change is irrelevant without checking it against the steps below.
+Read the diff below carefully. Then ask yourself: if someone read only CLAUDE.md, would they have an accurate and complete understanding of what this project now does and how it works?
 
-For each file, work through these steps in order:
-1. Look at every removed or modified line (lines starting with -). For each one, find any CLAUDE.md statement that describes that behaviour. Is that statement still accurate? If not, update or remove it.
-2. Look at every added or modified line (lines starting with +). Does it add or change something that falls under a category already documented in CLAUDE.md (e.g. a new script in a 'Commands' section, a new env var in an 'Environment variables' section)? If so, add it.
-3. Does the diff introduce a new concept significant enough to warrant a new section (e.g. a new tool, a new architectural pattern, a new required service)? If so, add it.
+For every statement in CLAUDE.md, check whether the diff contradicts it, makes it incomplete, or makes it stale. If so, update it.
 
-Do NOT update for: pure formatting/whitespace changes, UI copy changes, test-only changes, or lock file churn — unless those files also contain a relevant trigger as above.
+For every meaningful change in the diff, check whether CLAUDE.md mentions it. If it introduces or changes behaviour, commands, architecture, configuration, or conventions that are not reflected in CLAUDE.md, add it.
 
-Bug fixes are NOT automatically excluded. If a bug fix changes observable behaviour (e.g. a different branching strategy, a changed exit code, a new skip condition), and CLAUDE.md describes that behaviour, update it. Only skip a bug fix if it corrects something to match what CLAUDE.md already says.
+Only skip changes that have no impact on how the project is understood or used: pure formatting, variable renames with no behavioural effect, or churn in generated/lock files.
+
+If changes are needed, edit CLAUDE.md directly (it is at ./$CLAUDE_MD) before printing the report.
 
 After your assessment, you MUST print a report in exactly this format (always — whether or not you made changes):
 OUTCOME: UPDATED
@@ -106,9 +105,7 @@ REASONS:
 or if no changes were needed:
 OUTCOME: NO_CHANGE
 REASONS:
-- <reason each notable change was assessed and not documented>
-
-If changes are needed, edit CLAUDE.md directly (it is at ./$CLAUDE_MD) before printing the report.
+- <reason each change was assessed and not documented>
 
 Diff:
 $DIFF"
